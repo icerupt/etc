@@ -1,0 +1,112 @@
+#!/bin/bash
+
+main()
+{
+    sync "~/.config/nvim/init.vim"
+    sync "~/.config/nvim/plugins.vim"
+    sync "~/.config/nvim/rc"
+    sync "~/.config/nvim/syntax"
+    sync "~/.config/nvim/autoload"
+    sync "~/.config/nvim/ftdetect"
+    sync "~/.config/nvim/ultisnips"
+
+    sync "~/.config/fish/functions"
+    sync "~/.config/fish/config.fish"
+    sync "~/.config/gtk-3.0"
+    sync "~/.tmux.conf"
+    sync "~/.profile"
+    sync "~/.bashrc"
+    sync "~/.bash_profile"
+    sync "~/.gitconfig"
+    sync "~/.gitignore"
+    #sync "~/screencast"
+    #sync "~/emergency-proxy"
+    sync "~/enable-extensions"
+    sync "~/make-enable-extensions"
+    sync "/etc/fonts"
+    sync "/etc/pacman.d/mirrorlist"
+    sync "/etc/default"
+    sync "/etc/hosts"
+    sync "/etc/yaourtrc"
+    sync "/etc/makepkg.conf"
+    sync "/etc/pacman.conf"
+    sync "/etc/mkinitcpio.conf"
+    sync "/usr/local/bin/ml"
+}
+
+sync()
+{
+    if [[ $1 == $HOME/* || ! ( $1 == /* || $1 == "~"/* ) ]]; then
+        echo -e "! \e[1;31mHUMAN ERROR PREVENTION \e[0;31m$1\e[0m"
+        exit 3
+    fi
+
+    SRC=$(realpath -m $(expand-tilde "$1"))
+    if [[ -d $SRC ]]; then
+        sync-dir "$1"
+    else
+        sync-reg "$1"
+    fi
+}
+
+sync-dir()
+{
+    echo -n "* "
+    SRC=$(realpath -m $(expand-tilde "$1"))/    # XXX: the trailing slash '/' is IMPORTANT !!!
+    DST=$(realpath -m --relative-to . $(src-to-dst "$1"))
+    mkdir -p "$DST"
+    sync-work "$SRC" "$DST" "$1"
+}
+
+sync-reg()
+{
+    echo -n "  "
+    SRC=$(realpath -m $(expand-tilde "$1"))
+    DST=$(realpath -m --relative-to . $(src-to-dst "$1"))
+    DIR=$(dirname "$DST")
+    mkdir -p "$DIR"
+    sync-work "$SRC" "$DST" "$1"
+}
+
+expand-tilde()
+{
+    eval 'echo '"$1"
+}
+
+src-to-dst()
+{
+    echo "$@" | sed 's/^~\///; s/^\/etc\///; s/^\///'
+}
+
+sync-work()
+{
+    if [[ $2 == ..* || $2 == . || $2 == /* || $2 == home/* ]]; then
+        echo -e "\e[1;31mHUMAN ERROR PREVENTION: \e[1;32m$3 \e[0;34m$1 \e[0;35m$2\e[0m"
+        exit 2
+    fi
+    WS=$(tput cols)
+    W1=$((WS * 26 / 80))
+    W2=$((WS * 30 / 80))
+    W3=$((WS * 18 / 80))
+    F1=$(fix-string-width $W1 $3)
+    F2=$(fix-string-width $W2 $1)
+    F3=$(fix-string-width $W3 $2)
+    echo -e "\e[1;32m$F1 \e[0;34m$F2 \e[0;35m$F3\e[0m"
+    rsync -avhP --delete "$1" "$2" > /dev/null || exit 1
+}
+
+# string (int width, string str)
+function fix-string-width()
+{
+    if [[ ${#2} -gt $1 ]]; then
+        echo -n '…'
+        tail -c $1 <<< "$2"
+    else
+        printf "%-${1}s" "$2"
+    fi
+}
+
+main "$@"
+git add -A .
+git commit -avem "#`date -Iseconds`" && git push
+

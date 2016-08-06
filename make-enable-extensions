@@ -1,0 +1,9 @@
+#!/usr/bin/fish
+set -l out enable-extensions
+echo \#!/usr/bin/fish > $out
+echo gsettings set org.gnome.shell disable-extension-version-validation true >> $out
+echo -n gsettings set org.gnome.shell enabled-extensions \" >> $out
+gsettings get org.gnome.shell enabled-extensions | head -c -1 >> $out
+echo \" >> $out
+echo >> $out
+

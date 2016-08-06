@@ -1,0 +1,218 @@
+" Conflicts:
+"   Disabled due to conflicts to preim
+"
+" vtab: Virtual Tab
+" make continuous spaces behave like tabs
+"
+" You should make sure softtabstop=shiftwidth
+
+" Legend:
+"   "_" is used to represent a space
+"   "X" is used to represent a non-space character
+"   Assume tabstop = 4 for the explanation.
+"
+" Tab Classification:
+"   XX__ X___ ____ _X__ _XX_ _XXX ___X __
+"     ++  +++ ++++   ++    +              continuous "+" means a tab
+"                  .    .    .    ...  .. any one single "." means a space
+"   That is, continuous spaces till span[1] in a span is considered tab.
+"   If spaces cannot reach span[1], then they are considered spaces.
+"
+" Terms:
+"
+"        ┌──┬── spaning (string from tab_span[0] to tab_span[1])
+"        │ ┌┬── subject (string from col to tab_span[1])
+"        │ ││
+"   XX__ X___ _X__
+"        ││││
+"        ││└─── col (assuming cursor position is here)
+"        │└─┴── tab_metric
+"        └──┴── tab_span
+"
+" Motion Desire:
+"   -1  move left
+"   +1  move right
+"    0  stand still
+
+
+if exists("g:loaded_vtab")
+    finish
+endif
+let g:loaded_vtab = 1
+let g:vtab_disabled = 0
+let g:vtab_pause = 0
+
+func s:disabled()
+    if g:vtab_disabled
+        return 1
+    endif
+    " disable in visual and ctrl-visual mode
+    if mode() ==# "v" || mode() ==# "\<c-v>"
+        return 1
+    endif
+    if g:vtab_pause
+        let g:vtab_pause -= 1
+        return 1
+    endif
+    return 0
+endf
+
+"---------- TAB METRIC CALCULATION ----------
+
+" returns tab span
+func s:tab_span(col)
+    let tabstop_num = (a:col - 1) / &tabstop
+    let span_left = tabstop_num * &tabstop + 1
+    let span_right = span_left + &tabstop - 1
+    return [span_left, span_right]
+endf
+
+" returns tab metric if col is in tab
+" returns empty list if col is not in tab
+func s:tab_metric(col, line)
+    if s:disabled()
+        return []
+    endif
+
+    let col = a:col
+    let line = a:line
+    let span = s:tab_span(col)
+
+    " in-tab test
+    let subject = line[col-1 : span[1]-1]
+    let expect_len = span[1] - col + 1
+    if len(subject) < expect_len || match(subject, '[^ ]') != -1
+        return []
+    endif
+
+    " finding metric
+    let spanning = line[span[0]-1 : span[1]-1]
+    let metric_len = len(matchstr(spanning, ' *$'))
+    let metric_right = span[1]
+    let metric_left = metric_right - metric_len + 1
+    return [metric_left, metric_right]
+endf
+
+
+"---------- SNAPPING ----------
+let s:insert_mode = 0
+func s:insert(on)
+    let s:insert_mode = a:on
+    call s:snap()
+
+    " prevent Vim reset cursor position
+    let v:char = 'i'
+endf
+
+func s:space()
+    let g:vtab_pause = 1
+    return ' '
+endf
+
+func s:snap()
+    let pos = getcurpos()
+    let lnum = pos[1]
+    let col = pos[2]
+    let line = getline(lnum)
+    let metric = s:tab_metric(col, line)
+    if len(metric) != 2
+        return
+    endif
+
+    " snapping
+    if s:insert_mode
+        let pos[2] = metric[0]
+    else
+        let pos[2] = metric[1]
+    endif
+    call setpos('.', pos)
+endf
+
+au cursormoved * call <SID>snap()
+au cursormovedi * call <SID>snap()
+au insertenter * call <SID>insert(1)
+au insertleave * call <SID>insert(0)
+imap <expr> <space> <SID>space()
+
+
+"---------- DELETION ----------
+func s:delete_char(cmd)
+    let cmd = a:cmd
+    let pos = getcurpos()
+    let lnum = pos[1]
+    let col = pos[2]
+    let line = getline(lnum)
+    let metric = s:tab_metric(col, line)
+    if len(metric) != 2
+        return cmd
+    endif
+
+    " prepare the deletion command
+    let num_move_dels = col - metric[0]
+    let num_dels = metric[1] - col + 1
+    let move_dels = repeat("\<left>" . cmd, num_move_dels)
+    let dels = repeat(cmd, num_dels)
+    return move_dels . dels
+endf
+
+nnoremap <expr> x <SID>delete_char('x')
+inoremap <expr> <del> <SID>delete_char("\<del>")
+
+
+"---------- NAVIGATION ----------
+func s:normal_move_left()
+    let pos = getcurpos()
+    let lnum = pos[1]
+    let col = pos[2]
+    let line = getline(lnum)
+    let metric = s:tab_metric(col, line)
+    if len(metric) != 2
+        return "\<left>"
+    endif
+
+    let metric_len = metric[1] - metric[0] + 1
+    return metric_len . "\<left>"
+endf
+
+func s:insert_move_right()
+    let pos = getcurpos()
+    let lnum = pos[1]
+    let col = pos[2]
+    let line = getline(lnum)
+    let metric = s:tab_metric(col, line)
+    if len(metric) != 2
+        return "\<right>"
+    endif
+    return "\<c-o>\<right>"
+endf
+
+nnoremap <expr> <left> <SID>normal_move_left()
+vnoremap <expr> <left> <SID>normal_move_left()
+inoremap <expr> <right> <SID>insert_move_right()
+nnoremap <expr> h <SID>normal_move_left()
+vnoremap <expr> h <SID>normal_move_left()
+
+
+"---------- VISUAL ----------
+func s:vmode(cmd)
+    let cmd = a:cmd
+    let pos = getcurpos()
+    let lnum = pos[1]
+    let col = pos[2]
+    let line = getline(lnum)
+    let metric = s:tab_metric(col, line)
+    if len(metric) != 2
+        return cmd
+    endif
+
+    let left_moves_num = col - metric[0]
+    let right_moves_num = metric[1] - metric[0]
+    let g:vtab_pause = left_moves_num
+    let left_moves = repeat("\<left>", left_moves_num)
+    let right_moves = repeat("\<right>", right_moves_num)
+    return left_moves . cmd . right_moves
+endf
+
+nnoremap <expr> v <SID>vmode("v")
+nnoremap <expr> <c-v> <SID>vmode("\<c-v>")
+

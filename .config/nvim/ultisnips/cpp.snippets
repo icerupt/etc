@@ -1,0 +1,45 @@
+global !p
+import builtins
+builtins.t = t
+builtins.snip = snip 
+
+from helpers import *
+
+endglobal
+
+
+snippet m "insert main function" !b
+int main(${1:int argc, char* argv[]})
+{$0
+}
+
+endsnippet
+
+snippet ns "add namespace" !b
+namespace`!p show_unless(' ', 1)`$1
+{$0
+}
+
+endsnippet
+
+snippet e "std::cerr" !b
+std::cerr${1: << $0;}
+endsnippet
+
+snippet t "add function (full)" !b
+template <${1:class T}>
+${2:auto}`!p complete(2, "auto void int")` ${3:func}($4)
+{$0
+}
+endsnippet
+
+snippet a "add function (auto)" !b
+auto ${1:func}($2)
+{$0
+}
+endsnippet
+
+snippet c "const&" !b
+${1:const&}$0
+endsnippet
+

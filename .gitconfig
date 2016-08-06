@@ -1,0 +1,27 @@
+[user]
+    email = icerupt@gmail.com
+    name = ICErupt
+[push]
+    default = upstream
+	followTags = true
+[merge]
+	tool = vimdiff
+    commit = no
+    ff = no
+[core]
+    editor = nvim
+    excludesfile = ~/.gitignore
+    pager = less -+F -cRS
+    whitespace = blank-at-eol,-blank-at-eof,space-before-tab,tab-width=4
+    quotepath = false
+[diff]
+    tool = nvim -d
+    algorithm = patience
+[init]
+#   templatedir = ~/.git-template
+[mergetool]
+    keepBackup = false
+    path = nvim
+[credential]
+	helper = gnome-keyring
+

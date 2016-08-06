@@ -1,0 +1,20 @@
+
+set statusline=%!FUCK_CAMEL_CASE_desire()
+
+let s:prev = getcurpos()
+let s:curr = getcurpos()
+let s:move_desire = 0
+
+func! s:moved()
+    let s:prev = s:curr
+    let s:curr = getcurpos()
+    let s:move_desire = s:curr[4] - s:prev[4]
+endf
+
+func! FUCK_CAMEL_CASE_desire()
+    return string(s:prev) . " -> " . string(s:curr) . "  ::  " . string(s:move_desire)
+endf
+
+au cursormoved * call s:moved()
+au cursormovedi * call s:moved()
+
